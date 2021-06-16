@@ -181,15 +181,6 @@ impl<'a> Scanner<'a> {
                         .set_attributes(tokens.get(0).unwrap(), tokens.get(1).unwrap());
                 }
                 Tokenizer::Text => trees.last_mut().unwrap().set_text(token.value),
-                _ => {
-                    let length = trees.len() - 1;
-                    let tree = &mut trees[length];
-                    tree.children.push(Box::new(NodeTree::new(
-                        token.value,
-                        Vec::new(),
-                        stack.len(),
-                    )));
-                }
             }
         }
         node_tree
