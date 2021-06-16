@@ -8,6 +8,7 @@ struct NodeTree<'a> {
     index: usize,
     children: Vec<Box<NodeTree<'a>>>,
     attributes: HashMap<&'a str, &'a str>,
+    text: &'a str,
 }
 
 impl<'a> NodeTree<'a> {
@@ -17,11 +18,16 @@ impl<'a> NodeTree<'a> {
             index,
             children,
             attributes: HashMap::new(),
+            text: "",
         }
     }
 
     pub fn set_attributes(&mut self, key: &'a str, value: &'a str) {
         self.attributes.insert(key, value);
+    }
+
+    pub fn set_text(&mut self, text: &'a str) {
+        self.text = text;
     }
 }
 
@@ -174,6 +180,7 @@ impl<'a> Scanner<'a> {
                         .unwrap()
                         .set_attributes(tokens.get(0).unwrap(), tokens.get(1).unwrap());
                 }
+                Tokenizer::Text => trees.last_mut().unwrap().set_text(token.value),
                 _ => {
                     let length = trees.len() - 1;
                     let tree = &mut trees[length];
