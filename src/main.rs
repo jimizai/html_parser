@@ -29,6 +29,10 @@ impl<'a> NodeTree<'a> {
     pub fn set_text(&mut self, text: &'a str) {
         self.text = text;
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.children.len() == 0 && self.attributes.is_empty() && self.text.is_empty()
+    }
 }
 
 impl<'a> fmt::Display for NodeTree<'a> {
@@ -151,26 +155,26 @@ impl<'a> Scanner<'a> {
                 }
                 Tokenizer::EndTag => {
                     let data = stack.pop();
-                    if let Some(_) = data {
-                        let tree = trees.pop();
-                        if let Some(tree) = tree {
-                            // init
-                            if node_tree.index == 0 {
-                                node_tree.index = tree.index - 1;
-                            }
-                            // same tier
-                            if node_tree.index == (tree.index - 1) {
-                                node_tree.children.push(Box::new(tree));
-                            } else {
-                                node_tree.tag = tree.tag;
-                                node_tree.children.extend(tree.children);
-                                node_tree.attributes = tree.attributes;
-                                node_tree =
-                                    NodeTree::new("div", vec![Box::new(node_tree)], tree.index - 1);
-                            }
-                        }
-                    } else {
+                    if data.is_none() {
                         eprintln!("error parse token end tag {}", token.value);
+                        continue;
+                    }
+                    let tree = trees.pop();
+                    if let Some(tree) = tree {
+                        // init
+                        if node_tree.index == 0 {
+                            node_tree.index = tree.index - 1;
+                        }
+                        // same tier
+                        if node_tree.index == (tree.index - 1) {
+                            node_tree.children.push(Box::new(tree));
+                        } else {
+                            node_tree.tag = tree.tag;
+                            node_tree.children.extend(tree.children);
+                            node_tree.attributes = tree.attributes;
+                            node_tree =
+                                NodeTree::new("div", vec![Box::new(node_tree)], tree.index - 1);
+                        }
                     }
                 }
                 Tokenizer::Attribute => {
