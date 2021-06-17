@@ -1,6 +1,6 @@
 ### RoadMap
 
-[x] loose tags
-[] annotation
-[] special tags
-[] Doctype
+- [x] loose tags
+- [] annotation
+- [] special tags
+- [] Doctype
