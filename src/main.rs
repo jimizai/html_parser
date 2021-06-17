@@ -98,6 +98,7 @@ impl<'a> Scanner<'a> {
         let mut is_tag = false;
         let mut is_end = false;
         let mut is_attribute = false;
+        let mut is_string = false;
         while self.end > self.position {
             let byte = self.bytes[self.position];
             match byte {
@@ -105,12 +106,13 @@ impl<'a> Scanner<'a> {
                     if self.start_position != 0 {
                         let text = std::str::from_utf8(self.get_bytes()).unwrap();
                         tokens.push(Token::new(text, is_tag, is_end, is_attribute));
-                        // v.clear()
+                        self.start_position = 0;
                     }
                     is_tag = true;
                 }
                 b'>' => {
                     let text = std::str::from_utf8(self.get_bytes()).unwrap();
+                    println!("==={}", text);
                     tokens.push(Token::new(text, is_tag, is_end, is_attribute));
                     self.start_position = 0;
                     is_tag = false;
@@ -119,10 +121,15 @@ impl<'a> Scanner<'a> {
                 }
                 b'/' => {
                     if is_tag {
-                        is_end = true
+                        is_end = true;
                     }
+                    self.start_position = self.position + 1;
                 }
                 b' ' => {
+                    if is_string == true {
+                        self.position += 1;
+                        continue;
+                    }
                     if is_tag {
                         let text = std::str::from_utf8(self.get_bytes()).unwrap();
                         tokens.push(Token::new(text, is_tag, is_end, is_attribute));
@@ -131,6 +138,12 @@ impl<'a> Scanner<'a> {
                     }
                 }
                 b'\n' | b'\r' => {}
+                b'"' => {
+                    if self.start_position == 0 && !is_string {
+                        self.start_position = self.position;
+                    }
+                    is_string = !is_string
+                }
                 _ => {
                     if self.start_position == 0 {
                         self.start_position = self.position;
@@ -182,7 +195,7 @@ impl<'a> Scanner<'a> {
                     trees
                         .last_mut()
                         .unwrap()
-                        .set_attributes(tokens.get(0).unwrap(), tokens.get(1).unwrap());
+                        .set_attributes(tokens.get(0).unwrap_or(&""), tokens.get(1).unwrap_or(&""));
                 }
                 Tokenizer::Text => trees.last_mut().unwrap().set_text(token.value),
             }
