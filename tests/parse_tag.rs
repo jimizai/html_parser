@@ -1,4 +1,4 @@
-use html_parser::{Scanner, Token, Tokenizer::*};
+use html_parser::{status::Flags, Scanner, Token, Tokenizer::*};
 
 fn assert_eq_tokens(mut target: Vec<Token>, mut result: Vec<Token>) {
     for _ in 0..target.len() {
@@ -11,13 +11,10 @@ fn single_tag_close() {
     let text = b" <div /> ";
     let mut scanner = Scanner::new(text);
     let tokens = scanner.parse();
-    assert_eq!(
-        *tokens.get(0).unwrap(),
-        Token::new("div", true, false, false, false)
-    );
+    assert_eq!(*tokens.get(0).unwrap(), Token::new("div", Flags::IS_TAG));
     assert_eq!(
         *tokens.get(1).unwrap(),
-        Token::new("", true, true, false, false)
+        Token::new("", Flags::IS_TAG | Flags::IS_TAG_END)
     )
 }
 
@@ -26,14 +23,10 @@ fn loose_tag_close() {
     let text = b" <   div  /    > ";
     let mut scanner = Scanner::new(text);
     let tokens = scanner.parse();
-    println!("{:?}", tokens);
-    assert_eq!(
-        *tokens.get(0).unwrap(),
-        Token::new("div", true, false, false, false)
-    );
+    assert_eq!(*tokens.get(0).unwrap(), Token::new("div", Flags::IS_TAG));
     assert_eq!(
         *tokens.get(1).unwrap(),
-        Token::new("", true, true, false, false)
+        Token::new("", Flags::IS_TAG | Flags::IS_TAG_END)
     );
 }
 

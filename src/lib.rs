@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::fmt;
 
-mod status;
+pub mod status;
+
+use status::Flags;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeTree<'a> {
@@ -70,26 +72,19 @@ pub struct Token<'a> {
 }
 
 impl<'a> Token<'a> {
-    pub fn new(
-        value: &'a str,
-        is_tag: bool,
-        is_end: bool,
-        is_attribute: bool,
-        is_annotation: bool,
-    ) -> Token {
-        let tokenizer = match is_annotation {
-            true => Tokenizer::Annocation,
-            false => match is_tag {
-                true => match is_end {
-                    true => Tokenizer::EndTag,
-                    false => match is_attribute {
-                        false => Tokenizer::Tag,
-                        true => Tokenizer::Attribute,
-                    },
-                },
-                _ => Tokenizer::Text,
-            },
+    pub fn new(value: &'a str, status: Flags) -> Token {
+        let tokenizer = if status.contains(Flags::IS_ANNOTATION) {
+            Tokenizer::Annocation
+        } else if status.contains(Flags::IS_TAG_END) {
+            Tokenizer::EndTag
+        } else if status.contains(Flags::IS_ATTRIBUTE) {
+            Tokenizer::Attribute
+        } else if status.contains(Flags::IS_TAG) {
+            Tokenizer::Tag
+        } else {
+            Tokenizer::Text
         };
+
         Token { tokenizer, value }
     }
 }
@@ -106,147 +101,107 @@ impl<'a> Scanner<'a> {
 
     pub fn parse(&mut self) -> Vec<Token<'a>> {
         let mut tokens: Vec<Token<'a>> = Vec::new();
-        let mut is_tag = false;
-        let mut is_end = false;
-        let mut is_attribute = false;
-        let mut is_string = false;
-        let mut has_text = false;
-        let mut ignore_once = false;
-        let mut is_annotation = false;
+        let mut status = Flags::NONE;
 
         while self.end > self.position {
             let byte = self.bytes[self.position];
-            match is_annotation {
-                true => match byte {
+            if status.contains(Flags::IS_ANNOTATION) {
+                match byte {
                     b'-' => {
                         let next_byte = self.bytes[self.position + 1];
                         let third_byte = self.bytes[self.position + 2];
                         if next_byte == b'-' && third_byte == b'>' {
                             let text = std::str::from_utf8(self.get_bytes()).unwrap();
-                            tokens.push(Token::new(
-                                text,
-                                is_tag,
-                                is_end,
-                                is_attribute,
-                                is_annotation,
-                            ));
+                            tokens.push(Token::new(text, status));
                             self.start_position = 0;
-                            is_annotation = false;
+                            status -= Flags::IS_ANNOTATION;
                             self.position += 2;
                             continue;
                         }
                     }
                     _ => {}
-                },
-                false => match byte {
+                }
+            } else {
+                match byte {
                     b'<' => {
                         if self.start_position != 0 && self.position != self.start_position {
                             let text = std::str::from_utf8(self.get_bytes()).unwrap();
-                            tokens.push(Token::new(
-                                text,
-                                is_tag,
-                                is_end,
-                                is_attribute,
-                                is_annotation,
-                            ));
+                            tokens.push(Token::new(text, status));
                             self.start_position = 0;
                         }
-                        is_tag = true;
-                        ignore_once = false;
+                        status |= Flags::IS_TAG;
+                        status -= Flags::IGNORE_ONCE;
                     }
                     b'!' => {
-                        if is_tag {
+                        if status.contains(Flags::IS_TAG) {
                             let next_byte = self.bytes[self.position + 1];
                             let third_byte = self.bytes[self.position + 2];
                             if next_byte == b'-' && third_byte == b'-' {
                                 self.start_position = self.position + 3;
-                                is_annotation = true;
-                                is_tag = false;
-                                is_end = false;
-                                is_attribute = false;
-                                is_string = false;
-                                has_text = false;
-                                ignore_once = false;
+                                status.clear();
+                                status |= Flags::IS_ANNOTATION;
                             }
                         }
                     }
                     b'>' => {
                         if self.start_position != 0 {
                             let text = std::str::from_utf8(self.get_bytes()).unwrap();
-                            tokens.push(Token::new(
-                                text,
-                                is_tag,
-                                is_end,
-                                is_attribute,
-                                is_annotation,
-                            ));
+                            tokens.push(Token::new(text, status));
                             self.start_position = 0;
-                        } else if is_end {
-                            if !ignore_once {
-                                tokens.push(Token::new(
-                                    "",
-                                    is_tag,
-                                    is_end,
-                                    is_attribute,
-                                    is_annotation,
-                                ));
+                        } else if status.contains(Flags::IS_TAG_END) {
+                            if !status.contains(Flags::IGNORE_ONCE) {
+                                tokens.push(Token::new("", status));
                             } else {
-                                ignore_once = false;
+                                status -= Flags::IGNORE_ONCE;
                             }
                         }
-                        is_tag = false;
-                        is_end = false;
-                        is_attribute = false;
+                        status -= Flags::IS_TAG;
+                        status -= Flags::IS_TAG_END;
+                        status -= Flags::IS_ATTRIBUTE;
                     }
                     b'/' => {
-                        if is_string {
+                        if status.contains(Flags::IS_STRING) {
                             self.position += 1;
                             continue;
                         }
-                        if is_tag {
-                            is_end = true;
+                        if status.contains(Flags::IS_TAG) {
+                            status |= Flags::IS_TAG_END;
                         }
                         self.start_position = self.position + 1;
                     }
                     b'\n' | b'\r' | b' ' => {
-                        if is_string {
+                        if status.contains(Flags::IS_STRING) {
                             self.position += 1;
                             continue;
                         }
-                        if !has_text {
+                        if !status.contains(Flags::HAS_TEXT) {
                             self.position += 1;
                             self.start_position = 0;
                             continue;
-                        } else if is_tag {
-                            if is_end {
-                                ignore_once = true;
+                        } else if status.contains(Flags::IS_TAG) {
+                            if status.contains(Flags::IS_TAG_END) {
+                                status |= Flags::IGNORE_ONCE;
                             }
                             let text = std::str::from_utf8(self.get_bytes()).unwrap();
-                            tokens.push(Token::new(
-                                text,
-                                is_tag,
-                                is_end,
-                                is_attribute,
-                                is_annotation,
-                            ));
-                            is_attribute = true;
-                            has_text = false;
+                            tokens.push(Token::new(text, status));
+                            status |= Flags::IS_ATTRIBUTE;
+                            status -= Flags::HAS_TEXT;
                             self.start_position = 0;
                         }
                     }
                     b'"' => {
-                        if self.start_position == 0 && !is_string {
+                        if self.start_position == 0 && !status.contains(Flags::IS_STRING) {
                             self.start_position = self.position;
                         }
-                        is_string = !is_string
+                        status.toggle(Flags::IS_STRING);
                     }
                     _ => {
                         if self.start_position == 0 {
-                            has_text = true;
+                            status |= Flags::HAS_TEXT;
                             self.start_position = self.position;
                         }
                     }
-                },
+                }
             }
             self.position += 1;
         }
