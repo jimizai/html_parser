@@ -2,14 +2,15 @@ use bitflags::bitflags;
 
 bitflags! {
   pub struct Flags:u32 {
-    const IS_ANNOTATION = 0 << 1;
-    const IS_TAG = 0 << 2;
-    const IS_TAG_END = 0 << 3;
-    const IS_ATTRIBUTE = 0 << 4;
-    const IS_STRING = 0 << 5;
+    const NONE = 0;
+    const IS_ANNOTATION = 1 << 1;
+    const IS_TAG = 1 << 2;
+    const IS_TAG_END = 1 << 3;
+    const IS_ATTRIBUTE = 1 << 4;
+    const IS_STRING = 1 << 5;
 
-    const HAS_TEXT = 0 << 6;
-    const IGNORE_ONCE = 0 << 7;
+    const HAS_TEXT = 1 << 6;
+    const IGNORE_ONCE = 1 << 7;
   }
 }
 
