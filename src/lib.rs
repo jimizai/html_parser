@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
+mod status;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeTree<'a> {
     tag: &'a str,
